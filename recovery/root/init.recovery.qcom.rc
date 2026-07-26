@@ -1,0 +1,102 @@
+# Copyright (c) 2017-2023, The Linux Foundation. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of The Linux Foundation nor
+#       the names of its contributors may be used to endorse or promote
+#       products derived from this software without specific prior written
+#       permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+# ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+
+import /odm/etc/init/vendor.xiaomi.hw.touchfeature-service.rc
+
+on early-init
+    wait /sys/fs/selinux/enforce
+    write /sys/fs/selinux/enforce 0
+
+on early-fs
+    write /proc/sys/walt/sched_lib_name "recovery,magiskboot,Updater,updater,update_engine_sideload"
+    write /proc/sys/walt/sched_lib_mask_force 255
+
+on fs
+    export LD_LIBRARY_PATH /system/lib64:/vendor/lib64:/vendor/lib64/hw:/odm/lib64:/odm/lib64/hw
+    wait /dev/block/platform/soc/${ro.boot.bootdevice}
+    symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
+    write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
+    chmod 0660 /dev/qseecom
+    chown system drmrpc /dev/qseecom
+    chmod 0664 /dev/ion
+    chown system system /dev/ion
+    mkdir /mnt/vendor 0775 shell system
+    mkdir /mnt/vendor/persist 0775 shell system
+    mkdir /tmp/persist 0775 shell system
+    mount none /tmp/persist /mnt/vendor/persist bind rec
+
+on init
+    start vendor.boot-qti
+
+on boot
+    setprop sys.usb.config adb
+
+on property:twrp.modules.loaded=true
+    # 1. Create the mount point and mount the modem partition
+    mkdir /vendor/firmware_mnt 0770 system system
+    wait /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} 2
+    mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /vendor/firmware_mnt ro shortname=lower,uid=1000,gid=1000,dmask=227,fmask=337
+    
+    # 2. Force-feed the hidden Xiaomi firmware paths to the kernel's direct search
+    write /sys/module/firmware_class/parameters/path "/vendor/firmware_mnt/image,/vendor/firmware_mnt/image/kiwi,/vendor/firmware,/vendor/etc/firmware"
+
+    # 3. Trigger the delayed ADSP kick
+    start kick_adsp
+    
+    # 4. Start non-ADSP dependent daemons immediately
+    start vendor.qseecomd
+    start vibratorfeature-hal-service
+    start xiaomi-uinput
+
+# Background service to delay the ADSP kick by 2 seconds.
+# This prevents the race condition where ADSP requests adsp_dtb.mdt 
+# before OrangeFox finishes mounting the vendor logical partition.
+service kick_adsp /system/bin/sh -c "sleep 2; echo start > /sys/class/remoteproc/remoteproc1/state; sleep 1; setprop vendor.adsp.started true"
+    class core
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+
+# Start health-recovery ONLY after ADSP is up and the battery node exists
+on property:vendor.adsp.started=true
+    wait /sys/class/power_supply/battery 2
+    start vendor.health-recovery
+
+on property:vendor.sys.listeners.registered=true
+    start vendor.ssgtzd
+    start vendor.secure_element
+    start vendor.weaver_nxp
+    start vendor.keymint-qti
+    start vendor.gatekeeper_default
+
+service xiaomi-uinput /system/bin/xiaomi-uinput
+    class main
+    user root
+    group root system
+    seclabel u:r:recovery:s0
