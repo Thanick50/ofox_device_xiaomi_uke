@@ -603,3 +603,4 @@ subsystem mem_buf_vm
 
 # Q2SPI UWB device
 /dev/q2spiuwb    0660    uwb    uwb
+/dev/xiaomi-touch 0666 system system

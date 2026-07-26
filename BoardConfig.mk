@@ -40,7 +40,7 @@ ENABLE_SCHEDBOOST := true
 
 # Bootloader
 PRODUCT_PLATFORM := pineapple
-TARGET_BOOTLOADER_BOARD_NAME := peridot
+TARGET_BOOTLOADER_BOARD_NAME := uke
 TARGET_NO_BOOTLOADER := true
 TARGET_USES_UEFI := true
 
@@ -66,8 +66,12 @@ BOARD_RAMDISK_USE_LZ4 := true
 
 # A/B
 BOARD_EXCLUDE_KERNEL_FROM_RECOVERY_IMAGE := true
-
 AB_OTA_UPDATER := true
+
+TW_V_AB_BOARD := true
+TW_INCLUDE_UPDATE_ENGINE := true
+TW_INCLUDE_UPDATE_ENGINE_SIDELOAD := true
+
 AB_OTA_PARTITIONS += \
     boot \
     init_boot \
@@ -90,9 +94,9 @@ BOARD_AVB_ENABLE := true
 BOARD_RECOVERYIMAGE_PARTITION_SIZE := 104857600
 
 # Dynamic Partition
-BOARD_SUPER_PARTITION_SIZE := 9126805504
+BOARD_SUPER_PARTITION_SIZE := 8321499136
 BOARD_SUPER_PARTITION_GROUPS := qti_dynamic_partitions
-BOARD_QTI_DYNAMIC_PARTITIONS_SIZE := 9122611200
+BOARD_QTI_DYNAMIC_PARTITIONS_SIZE := 8317304832
 BOARD_QTI_DYNAMIC_PARTITIONS_PARTITION_LIST := system system_ext product vendor vendor_dlkm system_dlkm odm
 
 BOARD_PARTITION_LIST := $(call to-upper, $(BOARD_QTI_DYNAMIC_PARTITIONS_PARTITION_LIST))
@@ -148,6 +152,7 @@ TW_INCLUDE_FASTBOOTD := true
 
 # Other TWRP Configurations
 TW_THEME := portrait_hdpi
+TW_ROTATION := 270
 TW_FRAMERATE := 120
 RECOVERY_SDCARD_ON_DATA := true
 TARGET_RECOVERY_QCOM_RTC_FIX := true
@@ -165,20 +170,18 @@ TW_DEFAULT_BRIGHTNESS := 200
 TW_NO_SCREEN_BLANK := true
 TW_EXCLUDE_APEX := true
 TW_HAS_EDL_MODE := true
-
-# Haptic
-FIXED_HAPTICS := true
-
-ifeq ($(FIXED_HAPTICS),true)
-   TW_SUPPORT_INPUT_AIDL_HAPTICS := true
-   TW_SUPPORT_INPUT_AIDL_HAPTICS_FQNAME := "IVibrator/vibratorfeature"
-   TW_SUPPORT_INPUT_AIDL_HAPTICS_FIX_OFF := true
-else
-   TW_NO_HAPTICS := true
-endif
-
+TW_NO_HAPTICS := true
 TW_USE_SERIALNO_PROPERTY_FOR_DEVICE_ID := true
-TW_LOAD_VENDOR_MODULES := "adsp_loader_dlkm.ko focaltech_3683g.ko focaltech_touch.ko goodix_core.ko goodix_ts.ko nxp-nci.ko qti_battery_charger.ko xiaomi_touch.ko"
+TW_LOAD_VENDOR_MODULES := "qti_battery_charger.ko si_haptic.ko aw8697-haptic.ko spi-msm-geni.ko i2c-msm-geni.ko panel_event_notifier.ko miev.ko msm_drm.ko metis.ko xiaomi_touch.ko nt36532_touch.ko"
+TW_LOAD_VENDOR_DLKM_MODULES := true
 TW_LOAD_VENDOR_MODULES_EXCLUDE_GKI := true
 TW_CUSTOM_CPU_TEMP_PATH := "/sys/class/thermal/thermal_zone48/temp"
 TW_BATTERY_SYSFS_WAIT_SECONDS := 6
+TW_OXYGENOS_WORKAROUND := true
+
+
+TARGET_RECOVERY_DEVICE_MODULES += \
+    libdmabufheap
+
+TW_RECOVERY_ADDITIONAL_RELINK_LIBRARY_FILES += \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libdmabufheap.so

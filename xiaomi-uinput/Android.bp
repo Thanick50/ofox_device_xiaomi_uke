@@ -1,0 +1,13 @@
+//
+// xiaomi-uinput: evdev -> uinput touch bridge for recovery
+//
+
+cc_binary {
+    name: "xiaomi-uinput",
+    srcs: ["xiaomi-uinput.cpp"],
+    recovery: true,
+    cflags: [
+        "-Wall",
+        "-Wno-unused-parameter",
+    ],
+}
